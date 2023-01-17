@@ -1,0 +1,3 @@
+# A Simple Web Page with Rust and Vue.js
+
+Here's a simple web page with Rust and Vue.js. It uses a the Warp crate for routing and handlebars for templating. Straitforward way to start off building a page with templating and a reactive js framework. Next steps would be to add a database, saving of data in the front end (Rust -> Vue) and then manipulating that data, and posting data (Vue -> Rust) in order to save it to the database. I may not do the last step, because online users are terrible and allowing people to save information on the internet is sadness. Then I'd have to find hosting somewhere, but might just use a static hosting service such as github. Who knows? Putting this here in case someone is searching for an easy way to start a web project.
