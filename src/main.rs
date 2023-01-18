@@ -5,6 +5,10 @@ use handlebars::Handlebars;
 use serde::Serialize;
 use serde_json::json;
 use warp::Filter;
+use std::path::Path;
+use std::fs;
+use std::io::prelude::*;
+
 
 struct WithTemplate<T: Serialize> {
     name: &'static str,
@@ -19,6 +23,55 @@ where
         .render(template.name, &template.value)
         .unwrap_or_else(|err| err.to_string());
     warp::reply::html(render)
+}
+
+#[allow(dead_code)]
+fn escape_fn(input_string:&str)->String{
+    let returnval = input_string.to_string();
+    let mut returncondition = 0;
+    for (i, _c) in returnval.chars().enumerate() {
+        if i == 0 || i == 1 || i == input_string.len()-1 || i == input_string.len()-2{
+            returncondition +=1;
+        }
+    }
+    let mut returnvalchars = returnval.chars();
+    if returncondition == 4{
+        returnvalchars.next();
+        returnvalchars.next();
+        returnvalchars.next_back();
+        returnvalchars.next_back();
+    }
+    returnvalchars.as_str().to_string()
+}
+
+fn create_file(entry_path: String, contents: String){
+   let new_path = entry_path
+       .replace("obsidian_project", "obsidian_js");
+   //       .replace(".md", ".js");
+   let mut file = fs::File::create(new_path).unwrap();
+   file.write_all(contents.as_bytes()).unwrap();
+}
+
+fn parse_file(entry_path: String){
+    println!("in parse file and value of entry_path {:?}", entry_path.clone());
+    let contents = fs::read_to_string(entry_path.clone())
+        .expect("Should have been able to read the file");
+    println!("With text: \n{contents}");
+    create_file(entry_path.clone(), contents);
+}
+
+fn read_files(){
+    let path = Path::new("./src/obsidian_project");
+    match fs::remove_dir_all("./src/obsidian_js"){
+        Ok(x) => println!("remove_dir_all: {:?}", x), 
+        Err(x) => println!("there was an error in remove_dir_all {:?}", x)
+    }
+    fs::create_dir_all("./src/obsidian_js").unwrap();
+    for entry in fs::read_dir(path).expect("Unable to list") {
+        let entry = entry.expect("unable to get entry");
+        println!("{}", entry.path().display());
+        parse_file(entry.path().display().to_string());
+    }
 }
 
 #[tokio::main]
@@ -49,7 +102,7 @@ async fn main() {
                         }).mount('#app')
                     </script>
                     ";
-
+    read_files();
     let mut hb = Handlebars::new();
     hb.register_template_string("template.html", template)
         .unwrap();    
@@ -75,9 +128,11 @@ async fn main() {
 
     let hi = warp::path("hi").map(|| "Hello, World!");
 
+    let readme = warp::path("readme").and(warp::fs::dir("./src/obsidian_js/"));
     let routes = warp::get().and(
         home_page
         .or(hi)
+        .or(readme)
     );
 
     warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
