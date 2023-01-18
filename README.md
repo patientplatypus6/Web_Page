@@ -15,6 +15,7 @@ There are three options to do this
 
 I don't know if going to all that trouble is worth it, rather than just having a way for people to spin up javascript only non-user-interactive sites.
 
+- Update - Can now add pictures.
 
 # A Simple Web Page with Rust and Vue.js
 
