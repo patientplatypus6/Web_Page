@@ -25,6 +25,19 @@ where
     warp::reply::html(render)
 }
 
+fn is_an_image(name: String) -> bool {
+    println!("inside is_an_image and value of name: {:?}", name);
+    let image_formats = vec![".jpg", ".jpeg", ".gif", ".pdf", ".svg", ".tiff", ".webp", ".png"];
+    let mut is_an_image = false;
+    for ext in image_formats{
+        is_an_image = name.contains(ext);
+        if is_an_image {
+            break;
+        }
+    }
+    is_an_image
+}
+
 struct Parse {
     contents: String
 }
@@ -33,6 +46,26 @@ impl Parse {
     fn carriage_return(&self) -> Self {
         let new_contents = self.contents.replace("\n", "<br/>");
         let p = Parse{contents: new_contents};
+        p
+    }
+
+    #[allow(dead_code)]
+    fn add_picture_to_page(&mut self) -> Self{
+        let p = Parse{contents: self.contents.clone()};
+        let re = Regex::new(r"!\[\[([^\[\[]+)\]\]").unwrap();
+        let text = p.contents.clone();
+        let mut cleantext = p.contents.clone();
+        for capture in re.captures_iter(&text){
+            let uncleaned_capture = &capture[0].to_string();
+            let cleaned_capture = &capture[0].to_string().replace("[", "").replace("]", "").replace("!", "");
+            let imagestring = [
+                "<img src='/img/", 
+                cleaned_capture, 
+                "'/>"
+            ].join("");
+            cleantext = cleantext.replace(uncleaned_capture, &imagestring);
+        }
+        let p = Parse{contents: cleantext};
         p
     }
 
@@ -48,13 +81,14 @@ impl Parse {
             println!("&&&&&&&&&&&&&&&&&&&&&&&&&");
             let uncleaned_capture = &capture[0].to_string();
             let cleaned_capture = &capture[0].to_string().replace("[", "").replace("]", "");
-            if cleaned_capture.find("#").is_none(){
+            if cleaned_capture.find("#").is_none() && !is_an_image(cleaned_capture.to_string()) {
                 let (anchor_visible_name, anchor_href) = match cleaned_capture.match_indices("|").find_map(|(i, _val)| Some(i)) {
                     Some(cleaned_text_index) => {
                         println!("the value of res: {:?}", cleaned_capture);
                         let anchor_visible_name = cleaned_capture.get(cleaned_text_index+1..cleaned_capture.len()).unwrap();
                         let anchor_href = cleaned_capture.get(0..cleaned_text_index).unwrap();
                         (anchor_visible_name.to_string(), anchor_href.to_string())
+                        
                     }, 
                     None => {
                         println!("character | was not found");
@@ -65,7 +99,7 @@ impl Parse {
                 println!("The value of anchor_visible_name, anchor_href; {:?} {:?}", anchor_visible_name, anchor_href);
                 println!("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
                 let anchor_string = [
-                    "<a href='/obsidian/", 
+                    "<a href='/html/", 
                     &anchor_href,
                     ".html'/>", 
                     &anchor_visible_name,
@@ -81,35 +115,51 @@ impl Parse {
     }
 }
 
-fn create_file(entry_path: String, contents: String){
+fn create_page(entry_path: String, contents: String){
    let new_path = entry_path
-       .replace("obsidian_project", "obsidian_js")
+       .replace("obsidian_project", "obsidian_html")
        .replace(".md", ".html");
    let mut file = fs::File::create(new_path).unwrap();
    file.write_all(contents.as_bytes()).unwrap();
 }
 
+fn store_images(entry_path:String){
+    let new_path = entry_path
+        .replace("obsidian_project", "obsidian_img");
+    let _result = fs::copy(entry_path, new_path);
+}
+
 fn parse_file(entry_path: String){
     println!("in parse file and value of entry_path {:?}", entry_path.clone());
-    let contents = fs::read_to_string(entry_path.clone())
-        .expect("Should have been able to read the file");
-    println!("With text: \n{contents}");
-    let parsing_contents = Parse{contents: contents};
-    let parsed_contents = parsing_contents
-        .carriage_return()
-        .link_to_another_page();
-    println!("the value of parsed_contents is {:?}", parsed_contents.contents);
-    //println!("the value of parsing_contents after munging: {:?}", parsing_contents.contents.clone());
-    create_file(entry_path.clone(), parsed_contents.contents.clone());
+    if !is_an_image(entry_path.clone().to_string()){
+        let contents = fs::read_to_string(entry_path.clone())
+            .expect("Should have been able to read the file");
+        println!("With text: \n{contents}");
+        let parsing_contents = Parse{contents: contents};
+        let parsed_contents = parsing_contents
+            .carriage_return()
+            .add_picture_to_page()
+            .link_to_another_page();
+        println!("the value of parsed_contents is {:?}", parsed_contents.contents);
+        //println!("the value of parsing_contents after munging: {:?}", parsing_contents.contents.clone());
+        create_page(entry_path.clone(), parsed_contents.contents.clone());
+    }else{
+        store_images(entry_path.clone());
+    }
 }
 
 fn read_files(){
     let path = Path::new("./src/obsidian_project");
-    match fs::remove_dir_all("./src/obsidian_js"){
+    match fs::remove_dir_all("./src/obsidian_html"){
         Ok(x) => println!("remove_dir_all: {:?}", x), 
         Err(x) => println!("there was an error in remove_dir_all {:?}", x)
     }
-    fs::create_dir_all("./src/obsidian_js").unwrap();
+    match fs::remove_dir_all("./src/obsidian_img"){
+        Ok(x) => println!("remove dir_all: {:?}", x),
+        Err(x) => println!("there was an error in remove_dir_all {:?}", x)
+    }
+    fs::create_dir_all("./src/obsidian_html").unwrap();
+    fs::create_dir_all("./src/obsidian_img").unwrap();
     for entry in fs::read_dir(path).expect("Unable to list") {
         let entry = entry.expect("unable to get entry");
         println!("{}", entry.path().display());
@@ -169,11 +219,13 @@ async fn main() {
 
     let hi = warp::path("hi").map(|| "Hello, World!");
 
-    let obsidian = warp::path("obsidian").and(warp::fs::dir("src/obsidian_js/"));
+    let html = warp::path("html").and(warp::fs::dir("src/obsidian_html/"));
+    let img = warp::path("img").and(warp::fs::dir("src/obsidian_img/"));
     let routes = warp::get().and(
         home_page
         .or(hi)
-        .or(obsidian)
+        .or(html)
+        .or(img)
     );
 
     warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
