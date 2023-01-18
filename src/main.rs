@@ -25,29 +25,43 @@ where
     warp::reply::html(render)
 }
 
-#[allow(dead_code)]
-fn escape_fn(input_string:&str)->String{
-    let returnval = input_string.to_string();
-    let mut returncondition = 0;
-    for (i, _c) in returnval.chars().enumerate() {
-        if i == 0 || i == 1 || i == input_string.len()-1 || i == input_string.len()-2{
-            returncondition +=1;
-        }
+struct Parse {
+    contents: String
+}
+impl Parse {
+    fn carriage_return(&self) -> Self {
+        let new_contents = self.contents.replace("\n", "<br/>");
+        let p = Parse{contents: new_contents};
+        p
     }
-    let mut returnvalchars = returnval.chars();
-    if returncondition == 4{
-        returnvalchars.next();
-        returnvalchars.next();
-        returnvalchars.next_back();
-        returnvalchars.next_back();
+    #[allow(dead_code)]
+    fn link_to_another_page(&mut self) -> Self{
+        let p = Parse{contents: self.contents.clone()};
+        println!("value of link_to_another_page {:?}", self.contents.clone());
+        p
+//        self.contents
+//        let returnval = self.contents.to_string();
+//        let mut returncondition = 0;
+//        for (i, _c) in returnval.chars().enumerate() {
+//            if i == 0 || i == 1 || i == self.contents.len()-1 || i == self.content.len()-2{
+//                returncondition +=1;
+//            }
+//        }
+//        let mut returnvalchars = returnval.chars();
+//        if returncondition == 4{
+//            returnvalchars.next();
+//            returnvalchars.next();
+//            returnvalchars.next_back();
+//            returnvalchars.next_back();
+//        }
+//       returnvalchars.as_str().to_string()
     }
-    returnvalchars.as_str().to_string()
 }
 
 fn create_file(entry_path: String, contents: String){
    let new_path = entry_path
-       .replace("obsidian_project", "obsidian_js");
-   //       .replace(".md", ".js");
+       .replace("obsidian_project", "obsidian_js")
+       .replace(".md", ".html");
    let mut file = fs::File::create(new_path).unwrap();
    file.write_all(contents.as_bytes()).unwrap();
 }
@@ -57,7 +71,13 @@ fn parse_file(entry_path: String){
     let contents = fs::read_to_string(entry_path.clone())
         .expect("Should have been able to read the file");
     println!("With text: \n{contents}");
-    create_file(entry_path.clone(), contents);
+    let parsing_contents = Parse{contents: contents};
+    let parsed_contents = parsing_contents
+        .carriage_return()
+        .link_to_another_page();
+    println!("the value of parsed_contents is {:?}", parsed_contents.contents);
+    //println!("the value of parsing_contents after munging: {:?}", parsing_contents.contents.clone());
+    create_file(entry_path.clone(), parsed_contents.contents.clone());
 }
 
 fn read_files(){
@@ -115,8 +135,6 @@ async fn main() {
 
     //let home_page = warp::path::end().map(|| "Hello, World at root!");
     
-
-
     //GET /
     let home_page = warp::get()
         .and(warp::path::end())
@@ -128,7 +146,7 @@ async fn main() {
 
     let hi = warp::path("hi").map(|| "Hello, World!");
 
-    let readme = warp::path("readme").and(warp::fs::dir("./src/obsidian_js/"));
+    let readme = warp::path("readme").and(warp::fs::dir("src/obsidian_js/"));
     let routes = warp::get().and(
         home_page
         .or(hi)
