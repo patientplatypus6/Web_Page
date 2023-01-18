@@ -2,13 +2,20 @@
 use std::sync::Arc;
 
 use handlebars::Handlebars;
-use serde::Serialize;
 use serde_json::json;
 use warp::Filter;
 use std::path::Path;
 use std::fs;
 use std::io::prelude::*;
 use regex::Regex;
+//use serde::{Deserialize, Serialize};
+use serde::{Serialize};
+
+//struct Uploaded_Files {
+//    html: Vec<String>, 
+//    img: Vec<String>
+//}
+
 
 struct WithTemplate<T: Serialize> {
     name: &'static str,
@@ -167,18 +174,71 @@ fn read_files(){
     }
 }
 
+
+// Code I won't use in the template but am keeping for notes
+// this is the message {% message %}
+// {{user}}
+
 #[tokio::main]
 async fn main() {
     let template = "
                     <script src='https://unpkg.com/vue@3/dist/vue.global.js'></script>
                     
                     <div id='app'>
-                        this is the message : {% message %}
-                        {{user}}
+                        <h1>
+                            Welcome to Web Page
+                        </h1>
+                        <h3>
+                            This is a static site generator porting Obsidian to the Web! 
+                        </h3>
+                    
+                        <p>
+                            This project allows you to take an <a href='https//www.obsidian.md'>Obsidian.md</a> project, upload it and then edit the project using Vue.js in a WYSIWYG (what you see is what you get).
+                            For the moment the project is primarily built around get requests, although post requests may be in the works (not sure).
+                        </p>
+
+                        <p>
+                            Here are the major project guidelines - 
+                        </p>
+                        
+                        <ul>
+                            <li>
+                                Statically upload Obsidian files - done!
+                            </li>
+                            <li>
+                                WYSIWYG modification of files using Vue.js - TODO
+                            </li>
+                            <li>
+                                Login/Auth for multiple users - todo
+                            </li>
+                            <li>
+                                Socketing real time collaboration on file editing - TODO (needs login/auth as well).
+                            </li>
+                            <li>
+                                General css work on UI/UX for the dashboard interface - TODO
+                            </li>
+                        </ul>
+                       
+                        <div>
+                            testing a message: {% message %}
+                        </div>
+                        
+                        <div>
+                            {{html_files}}
+                        </div>
+
+                        <div>
+                            [[html_files]]
+                        </div>
+                    
                     </div>
                         
                     <script>
                         const { createApp } = Vue
+
+                        let html_files = {{html_files}};
+
+                        console.log('the value of html_files:', {{html_files}});
 
                         createApp({
                             data() {
@@ -188,9 +248,8 @@ async fn main() {
                             },
                             delimiters: ['{%', '%}'],
                             mounted(){
-                                console.log('the app is mounted');
-                                console.log('this is the message: ', this.message);
-                                this.$forceUpdate();
+                                console.log('inside the mounted function');
+                                this.$forceUpdate()
                             }
                         }).mount('#app')
                     </script>
@@ -209,11 +268,48 @@ async fn main() {
     //let home_page = warp::path::end().map(|| "Hello, World at root!");
     
     //GET /
+    
+    println!("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
+    println!("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
+    println!("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
+    
+    let paths_html = fs::read_dir("./src/obsidian_html").unwrap();
+    let paths_img = fs::read_dir("./src/obsidian_img").unwrap();
+
+    let mut html_vec: Vec<String> = vec![];
+    let mut img_vec : Vec<String> = vec![];
+
+    for path in paths_html {
+        html_vec = [html_vec, vec![path.unwrap().path().display().to_string()]].concat();
+    }
+
+    for path in paths_img {
+        img_vec  = [img_vec, vec![path.unwrap().path().display().to_string()]].concat();
+    }
+
+    println!("value of html_vec {:?}", html_vec.clone());
+    println!("value of img_vec  {:?}", img_vec.clone());
+    
+    println!("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
+    println!("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
+    println!("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
+
+    //let uploaded_files = Uploaded_Files {
+    //    html: html_vec.to_owned(),
+    //    img : img_vec.to_owned()
+    //}
+
+
+
     let home_page = warp::get()
         .and(warp::path::end())
-        .map(|| WithTemplate {
+        .map(move || WithTemplate {
             name: "template.html",
-            value: json!({"user" : "Warp"}),
+            value: json!({
+                "user" : "Warp", 
+                "html_files": html_vec.clone(),
+                "img_files": img_vec.clone()
+            }),
         })
         .map(handlebars);
 
