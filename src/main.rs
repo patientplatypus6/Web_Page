@@ -28,6 +28,7 @@ where
 struct Parse {
     contents: String
 }
+
 impl Parse {
     fn carriage_return(&self) -> Self {
         let new_contents = self.contents.replace("\n", "<br/>");
@@ -35,63 +36,48 @@ impl Parse {
         p
     }
 
-//    fn split_keep<'a>(r: &Regex, text: &'a str) -> Vec<&'a str> {
-//        let mut result = Vec::new();
-//        let mut last = 0;
-//        for (index, matched) in text.match_indices(r) {
-//            if last != index {
-//                result.push(&text[last..index]);
-//            }
-//            result.push(matched);
-//            last = index + matched.len();
-//        }
-//        if last < text.len() {
-//            result.push(&text[last..]);
-//        }
-//        result
-//   }
-
     #[allow(dead_code)]
     fn link_to_another_page(&mut self) -> Self{
         let p = Parse{contents: self.contents.clone()};
-        //println!("value of link_to_another_page {:?}", self.contents.clone());
-        //let s_slice: &str = &*self.contents.clone(); 
-        //let inputs:Vec<&str> = s_slice.split("[[").filter(|k| !k.is_empty()).collect();        
-//        let seperator = Regex::new(r"\[[^\]]*]]").expect("invalid regex");
-//        let splits = self.split_keep(&seperator, "this... is a, test");
-//            for split in splits {
-//            println!("\"{}\"", split);
-//        }
-//        let s_slice: &str = &*self.contents.clone();        
-//        let items: Vec<_> = s_slice
-//            .split_inclusive('[', ']')
-//            .split_inclusive('[', ']')
-//            .collect();
-
-        let re = Regex::new(r"\[\[.*\]\]").unwrap();
+        let re = Regex::new(r"\[\[([^\[\[]+)\]\]").unwrap();
         let text = p.contents.clone();
+        let mut cleantext = p.contents.clone();
         for capture in re.captures_iter(&text){
+            println!("&&&&&&&&&&&&&&&&&&&&&&&&&");
             println!("the value of the capture is {:?}", capture);
+            println!("&&&&&&&&&&&&&&&&&&&&&&&&&");
+            let uncleaned_capture = &capture[0].to_string();
+            let cleaned_capture = &capture[0].to_string().replace("[", "").replace("]", "");
+            if cleaned_capture.find("#").is_none(){
+                let (anchor_visible_name, anchor_href) = match cleaned_capture.match_indices("|").find_map(|(i, _val)| Some(i)) {
+                    Some(cleaned_text_index) => {
+                        println!("the value of res: {:?}", cleaned_capture);
+                        let anchor_visible_name = cleaned_capture.get(cleaned_text_index+1..cleaned_capture.len()).unwrap();
+                        let anchor_href = cleaned_capture.get(0..cleaned_text_index).unwrap();
+                        (anchor_visible_name.to_string(), anchor_href.to_string())
+                    }, 
+                    None => {
+                        println!("character | was not found");
+                        (cleaned_capture.to_string(), cleaned_capture.to_string())
+                    }
+                };
+                println!("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
+                println!("The value of anchor_visible_name, anchor_href; {:?} {:?}", anchor_visible_name, anchor_href);
+                println!("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
+                let anchor_string = [
+                    "<a href='/obsidian/", 
+                    &anchor_href,
+                    ".html'/>", 
+                    &anchor_visible_name,
+                    "</a>"
+                ].join("");
+                cleantext = cleantext.replace(uncleaned_capture, &anchor_string);
+            }else{
+                //todo
+            }
         }
-
-//        println!("What is the value of the inputs {:?}", inputs);
+        let p = Parse{contents: cleantext};
         p
-//        self.contents
-//        let returnval = self.contents.to_string();
-//        let mut returncondition = 0;
-//        for (i, _c) in returnval.chars().enumerate() {
-//            if i == 0 || i == 1 || i == self.contents.len()-1 || i == self.content.len()-2{
-//                returncondition +=1;
-//            }
-//        }
-//        let mut returnvalchars = returnval.chars();
-//        if returncondition == 4{
-//            returnvalchars.next();
-//            returnvalchars.next();
-//            returnvalchars.next_back();
-//            returnvalchars.next_back();
-//        }
-//       returnvalchars.as_str().to_string()
     }
 }
 
@@ -183,11 +169,11 @@ async fn main() {
 
     let hi = warp::path("hi").map(|| "Hello, World!");
 
-    let readme = warp::path("readme").and(warp::fs::dir("src/obsidian_js/"));
+    let obsidian = warp::path("obsidian").and(warp::fs::dir("src/obsidian_js/"));
     let routes = warp::get().and(
         home_page
         .or(hi)
-        .or(readme)
+        .or(obsidian)
     );
 
     warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
