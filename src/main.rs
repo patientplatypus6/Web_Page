@@ -8,7 +8,7 @@ use warp::Filter;
 use std::path::Path;
 use std::fs;
 use std::io::prelude::*;
-
+use regex::Regex;
 
 struct WithTemplate<T: Serialize> {
     name: &'static str,
@@ -34,10 +34,47 @@ impl Parse {
         let p = Parse{contents: new_contents};
         p
     }
+
+//    fn split_keep<'a>(r: &Regex, text: &'a str) -> Vec<&'a str> {
+//        let mut result = Vec::new();
+//        let mut last = 0;
+//        for (index, matched) in text.match_indices(r) {
+//            if last != index {
+//                result.push(&text[last..index]);
+//            }
+//            result.push(matched);
+//            last = index + matched.len();
+//        }
+//        if last < text.len() {
+//            result.push(&text[last..]);
+//        }
+//        result
+//   }
+
     #[allow(dead_code)]
     fn link_to_another_page(&mut self) -> Self{
         let p = Parse{contents: self.contents.clone()};
-        println!("value of link_to_another_page {:?}", self.contents.clone());
+        //println!("value of link_to_another_page {:?}", self.contents.clone());
+        //let s_slice: &str = &*self.contents.clone(); 
+        //let inputs:Vec<&str> = s_slice.split("[[").filter(|k| !k.is_empty()).collect();        
+//        let seperator = Regex::new(r"\[[^\]]*]]").expect("invalid regex");
+//        let splits = self.split_keep(&seperator, "this... is a, test");
+//            for split in splits {
+//            println!("\"{}\"", split);
+//        }
+//        let s_slice: &str = &*self.contents.clone();        
+//        let items: Vec<_> = s_slice
+//            .split_inclusive('[', ']')
+//            .split_inclusive('[', ']')
+//            .collect();
+
+        let re = Regex::new(r"\[\[.*\]\]").unwrap();
+        let text = p.contents.clone();
+        for capture in re.captures_iter(&text){
+            println!("the value of the capture is {:?}", capture);
+        }
+
+//        println!("What is the value of the inputs {:?}", inputs);
         p
 //        self.contents
 //        let returnval = self.contents.to_string();
