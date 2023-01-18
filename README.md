@@ -1,4 +1,4 @@
-# A Simple Web Page with Rust and Vue.js
+# Using Obsidian as a Static Site Generator
 
 Here's a way to use Obsidian to convert your files into a static site generator. It's in the first stages, so all it does is take the markdown files, converts them to html and then searches for any page links using the delimiters `[[` and `]]` and then converts them into anchor links using Regex. The next steps would be to add a WSIWYG html/css editor that would incorporate Vue.js, find a way to organize the files, and add the ability to add pictures, and links to sections. 
 
