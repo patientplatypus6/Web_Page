@@ -1,21 +1,13 @@
 #![deny(warnings)]
 use std::sync::Arc;
-
-use handlebars::Handlebars;
+use serde::{Serialize};
 use serde_json::json;
+use handlebars::Handlebars;
 use warp::Filter;
 use std::path::Path;
 use std::fs;
 use std::io::prelude::*;
 use regex::Regex;
-//use serde::{Deserialize, Serialize};
-use serde::{Serialize};
-
-//struct Uploaded_Files {
-//    html: Vec<String>, 
-//    img: Vec<String>
-//}
-
 
 struct WithTemplate<T: Serialize> {
     name: &'static str,
@@ -181,9 +173,28 @@ fn read_files(){
 
 #[tokio::main]
 async fn main() {
+
+    let document_list = "
+        <script src='https://unpkg.com/vue@3/dist/vue.global.js'></script>
+        <div id='document_list'>TESTING: {% message %}</div>
+        <script>
+            const { createApp } = Vue
+
+            export default createApp({
+                data() {
+                    return {
+                        message: 'Hello from document_list'
+                    }
+                }, 
+                delimiters: ['{%', '%}'],
+            }).mount('#document_list')
+        </script>
+    ";
+
     let template = "
                     <script src='https://unpkg.com/vue@3/dist/vue.global.js'></script>
-                    
+
+
                     <div id='app'>
                         <h1>
                             Welcome to Web Page
@@ -224,8 +235,19 @@ async fn main() {
                         </div>
                         
                         <div>
-                            {{html_files}}
+                            {{html_files.0}}
                         </div>
+
+                        <div>
+                            there should be a document list here
+                            <Document_List />
+                        </div>
+
+                        <ul>
+                            <li v-for='value in {{html_files}}'>
+                                {{ value }}
+                            </li>
+                        </ul>
 
                         <div>
                             [[html_files]]
@@ -235,7 +257,7 @@ async fn main() {
                         
                     <script>
                         const { createApp } = Vue
-
+                        import Document_List from './document_list.html'
                         let html_files = {{html_files}};
 
                         console.log('the value of html_files:', {{html_files}});
@@ -252,23 +274,20 @@ async fn main() {
                                 this.$forceUpdate()
                             }
                         }).mount('#app')
+
                     </script>
                     ";
     read_files();
+    
     let mut hb = Handlebars::new();
     hb.register_template_string("template.html", template)
         .unwrap();    
-    // Turn Handlebars instance into a Filter so we can combine it
-    // easily with others...
+    hb.register_template_string("document_list.html", document_list)
+        .unwrap();
     let hb = Arc::new(hb);
 
-    // Create a reusable closure to render template
     let handlebars = move |with_template| render(with_template, hb.clone());
 
-    //let home_page = warp::path::end().map(|| "Hello, World at root!");
-    
-    //GET /
-    
     println!("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
     println!("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
     println!("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
@@ -277,51 +296,58 @@ async fn main() {
     let paths_img = fs::read_dir("./src/obsidian_img").unwrap();
 
     let mut html_vec: Vec<String> = vec![];
-    let mut img_vec : Vec<String> = vec![];
+    let mut img_vec:  Vec<String> = vec![];
 
+    //let mut i_html:u32 = 0;
     for path in paths_html {
-        html_vec = [html_vec, vec![path.unwrap().path().display().to_string()]].concat();
+        html_vec.append(&mut vec![path.unwrap().path().display().to_string()]);
     }
 
+    //let mut i_img:u32 = 0;
     for path in paths_img {
-        img_vec  = [img_vec, vec![path.unwrap().path().display().to_string()]].concat();
+        img_vec.append(&mut vec![path.unwrap().path().display().to_string()]);
     }
 
     println!("value of html_vec {:?}", html_vec.clone());
     println!("value of img_vec  {:?}", img_vec.clone());
     
+    //let uploaded_files : UploadedFiles = serde_json::from_str(data).unwrap();
+
     println!("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
     println!("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
     println!("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
-
-    //let uploaded_files = Uploaded_Files {
-    //    html: html_vec.to_owned(),
-    //    img : img_vec.to_owned()
-    //}
-
-
 
     let home_page = warp::get()
         .and(warp::path::end())
         .map(move || WithTemplate {
             name: "template.html",
             value: json!({
-                "user" : "Warp", 
-                "html_files": html_vec.clone(),
-                "img_files": img_vec.clone()
+                "user": "Warp", 
+                "test": {
+                    "0": "something"
+                },
+                "html_files": html_vec, 
+                "img_files" : img_vec
             }),
         })
-        .map(handlebars);
+        .map(handlebars.clone());
+
+    let document_list = warp::path("document_list")
+        .map(move || WithTemplate {
+            name: "document_list.html",
+            value: json!({})
+        })
+        .map(handlebars.clone());
 
     let hi = warp::path("hi").map(|| "Hello, World!");
-
     let html = warp::path("html").and(warp::fs::dir("src/obsidian_html/"));
-    let img = warp::path("img").and(warp::fs::dir("src/obsidian_img/"));
+    let img = warp::path("img").and(warp::fs::dir("src/obsidian/html/"));
     let routes = warp::get().and(
         home_page
         .or(hi)
         .or(html)
         .or(img)
+        .or(document_list)
     );
 
     warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
